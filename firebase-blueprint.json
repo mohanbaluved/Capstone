@@ -1,0 +1,117 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with skill scores and mastery data.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "skillScore": { "type": "number", "description": "Overall skill score (0-100)" },
+        "skillLevel": { "type": "string", "enum": ["Beginner", "Intermediate", "Advanced", "Expert"] },
+        "topicMastery": { 
+          "type": "object", 
+          "description": "Map of topic names to mastery scores (0-100)" 
+        },
+        "trustWeight": { "type": "number", "description": "Computed trust weight based on integrity and confidence" },
+        "integrityScore": { "type": "number" },
+        "confidenceScore": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "skillScore"]
+    },
+    "Assessment": {
+      "title": "Assessment",
+      "description": "A coding assessment submission and its AI evaluation.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "problemId": { "type": "string" },
+        "problemTitle": { "type": "string" },
+        "language": { "type": "string" },
+        "code": { "type": "string" },
+        "pseudoCode": { "type": "string" },
+        "explanation": { "type": "string" },
+        "evaluation": {
+          "type": "object",
+          "properties": {
+            "logic_score": { "type": "number" },
+            "code_score": { "type": "number" },
+            "communication_score": { "type": "number" },
+            "performance": { "type": "number" },
+            "strengths": { "type": "array", "items": { "type": "string" } },
+            "improvements": { "type": "array", "items": { "type": "string" } },
+            "suggestions": { "type": "array", "items": { "type": "string" } },
+            "analysis": {
+              "type": "object",
+              "properties": {
+                "correctness": { "type": "number" },
+                "timeComplexity": { "type": "string" },
+                "spaceComplexity": { "type": "string" },
+                "isOptimal": { "type": "boolean" }
+              }
+            }
+          }
+        },
+        "integrity": {
+          "type": "object",
+          "properties": {
+            "pasteCount": { "type": "number" },
+            "tabSwitchCount": { "type": "number" },
+            "idleTime": { "type": "number" },
+            "aiCalls": { "type": "number" }
+          }
+        },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "code", "timestamp"]
+    },
+    "Problem": {
+      "title": "Problem",
+      "description": "A coding problem definition.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "difficulty": { "type": "string", "enum": ["Easy", "Medium", "Hard"] },
+        "topic": { "type": "string" },
+        "constraints": { "type": "array", "items": { "type": "string" } },
+        "examples": { "type": "array", "items": { "type": "object" } }
+      },
+      "required": ["id", "title", "description", "difficulty", "topic"]
+    },
+    "Module": {
+      "title": "Learning Module",
+      "description": "A recommended learning module.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "topic": { "type": "string" },
+        "difficulty": { "type": "string" },
+        "content": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile data."
+    },
+    "/assessments/{assessmentId}": {
+      "schema": "Assessment",
+      "description": "Individual assessment records."
+    },
+    "/problems/{problemId}": {
+      "schema": "Problem",
+      "description": "Coding problems database."
+    },
+    "/modules/{moduleId}": {
+      "schema": "Module",
+      "description": "Learning modules."
+    }
+  }
+}

@@ -1,0 +1,106 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required, email format)
+    //   - displayName: string
+    //   - skillScore: number (0-100)
+    //   - skillLevel: string (Beginner, Intermediate, Advanced, Expert)
+    //   - topicMastery: map (topic -> score)
+    //   - trustWeight: number
+    //   - integrityScore: number
+    //   - confidenceScore: number
+    //   - createdAt: timestamp
+    //   - updatedAt: timestamp
+    //
+    // Collection: assessments
+    // Document ID: {assessmentId}
+    // Fields:
+    //   - userId: string (required)
+    //   - problemId: string
+    //   - problemTitle: string
+    //   - language: string
+    //   - code: string
+    //   - pseudoCode: string
+    //   - explanation: string
+    //   - evaluation: map (scores, analysis, strengths, etc.)
+    //   - integrity: map (pasteCount, tabSwitchCount, etc.)
+    //   - timestamp: timestamp
+    //
+    // Collection: problems
+    // Document ID: {problemId}
+    // Fields:
+    //   - id: string
+    //   - title: string
+    //   - description: string
+    //   - difficulty: string
+    //   - topic: string
+    //   - constraints: list
+    //   - examples: list
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "mohanbalu1235@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'skillScore']) &&
+             data.uid is string &&
+             data.email is string &&
+             data.skillScore is number &&
+             data.skillScore >= 0 && data.skillScore <= 100;
+    }
+
+    function isValidAssessment(data) {
+      return data.keys().hasAll(['userId', 'code', 'timestamp']) &&
+             data.userId == request.auth.uid &&
+             data.code is string &&
+             data.code.size() < 50000;
+    }
+
+    // Rules
+    
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) || isAdmin();
+    }
+
+    match /assessments/{assessmentId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidAssessment(request.resource.data);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /problems/{problemId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /modules/{moduleId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}
