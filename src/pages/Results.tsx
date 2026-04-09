@@ -35,7 +35,19 @@ const Results: React.FC = () => {
           .single();
           
         if (data) {
-          setAssessment(data as Assessment);
+          setAssessment({
+            id: data.id,
+            userId: data.user_id,
+            problemId: data.problem_id,
+            problemTitle: data.problem_title,
+            language: data.language,
+            code: data.code,
+            pseudoCode: data.pseudo_code,
+            explanation: data.explanation,
+            evaluation: data.evaluation,
+            integrity: data.integrity,
+            timestamp: data.timestamp
+          } as Assessment);
         }
       } catch (error) {
         console.error("Error fetching assessment:", error);

@@ -46,8 +46,8 @@ export const submitAssessment = async (req: Request, res: Response) => {
   let topicMastery = {};
 
   if (userData) {
-    currentSkillScore = userData.skillScore || 0;
-    topicMastery = userData.topicMastery || {};
+    currentSkillScore = userData.skill_score || 0;
+    topicMastery = userData.topic_mastery || {};
   }
 
   const newSkillScore = scoringService.updateSkillScore(currentSkillScore, performance, trustWeight);
@@ -62,24 +62,24 @@ export const submitAssessment = async (req: Request, res: Response) => {
   await supabase
     .from("users")
     .update({
-      skillScore: newSkillScore,
-      skillLevel: newSkillLevel,
-      topicMastery,
-      trustWeight,
-      integrityScore,
-      confidenceScore,
-      updatedAt: new Date().toISOString()
+      skill_score: newSkillScore,
+      skill_level: newSkillLevel,
+      topic_mastery: topicMastery,
+      trust_weight: trustWeight,
+      integrity_score: integrityScore,
+      confidence_score: confidenceScore,
+      updated_at: new Date().toISOString()
     })
     .eq("uid", userId);
 
   // 4. Save Assessment
   const assessmentData = {
-    userId,
-    problemId,
-    problemTitle,
+    user_id: userId,
+    problem_id: problemId,
+    problem_title: problemTitle,
     language,
     code,
-    pseudoCode,
+    pseudo_code: pseudoCode,
     explanation,
     evaluation: {
       ...evaluation,
@@ -105,8 +105,19 @@ export const submitAssessment = async (req: Request, res: Response) => {
 };
 
 export const getProblems = async (req: Request, res: Response) => {
-  const problemsPath = path.join(__dirname, "../config/problems.json");
-  const problemsData = fs.readFileSync(problemsPath, "utf-8");
-  const problems = JSON.parse(problemsData);
-  res.json(problems);
+  try {
+    const problemsPath = path.join(process.cwd(), "src/server/config/problems.json");
+    if (!fs.existsSync(problemsPath)) {
+      // Fallback for different build environments
+      const altPath = path.join(__dirname, "../config/problems.json");
+      const problemsData = fs.readFileSync(altPath, "utf-8");
+      return res.json(JSON.parse(problemsData));
+    }
+    const problemsData = fs.readFileSync(problemsPath, "utf-8");
+    const problems = JSON.parse(problemsData);
+    res.json(problems);
+  } catch (error) {
+    console.error("Error reading problems:", error);
+    res.status(500).json({ error: "Failed to load problems" });
+  }
 };

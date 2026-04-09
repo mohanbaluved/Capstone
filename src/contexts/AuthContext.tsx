@@ -60,32 +60,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const currentUser = userData.user;
         
         if (currentUser) {
-          const newProfile: UserProfile = {
+          const newProfileData = {
             uid: currentUser.id,
             email: currentUser.email || "",
-            displayName: currentUser.user_metadata.full_name || currentUser.email?.split('@')[0] || "",
-            skillScore: 0,
-            skillLevel: "Beginner",
-            topicMastery: {},
-            trustWeight: 1,
-            integrityScore: 100,
-            confidenceScore: 100,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+            display_name: currentUser.user_metadata.full_name || currentUser.email?.split('@')[0] || "",
+            skill_score: 0,
+            skill_level: "Beginner",
+            topic_mastery: {},
+            trust_weight: 1,
+            integrity_score: 100,
+            confidence_score: 100,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
           };
           
           const { data: createdProfile, error: createError } = await supabase
             .from("users")
-            .insert([newProfile])
+            .insert([newProfileData])
             .select()
             .single();
             
-          if (!createError) {
-            setProfile(createdProfile as UserProfile);
+          if (!createError && createdProfile) {
+            setProfile({
+              uid: createdProfile.uid,
+              email: createdProfile.email,
+              displayName: createdProfile.display_name,
+              skillScore: createdProfile.skill_score,
+              skillLevel: createdProfile.skill_level,
+              topicMastery: createdProfile.topic_mastery,
+              trustWeight: createdProfile.trust_weight,
+              integrityScore: createdProfile.integrity_score,
+              confidenceScore: createdProfile.confidence_score,
+              createdAt: createdProfile.created_at,
+              updatedAt: createdProfile.updated_at,
+            } as UserProfile);
           }
         }
       } else if (data) {
-        setProfile(data as UserProfile);
+        setProfile({
+          uid: data.uid,
+          email: data.email,
+          displayName: data.display_name,
+          skillScore: data.skill_score,
+          skillLevel: data.skill_level,
+          topicMastery: data.topic_mastery,
+          trustWeight: data.trust_weight,
+          integrityScore: data.integrity_score,
+          confidenceScore: data.confidence_score,
+          createdAt: data.created_at,
+          updatedAt: data.updated_at,
+        } as UserProfile);
       }
     } catch (err) {
       console.error("Error fetching profile:", err);
