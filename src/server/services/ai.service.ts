@@ -39,16 +39,26 @@ const evaluationSchema = z.object({
 export type EvaluationOutput = z.infer<typeof evaluationSchema>;
 
 export class AIService {
-  private model: ChatOpenAI;
+  private model: ChatOpenAI | null = null;
   private parser: StructuredOutputParser<typeof evaluationSchema>;
 
   constructor() {
-    this.model = new ChatOpenAI({
-      modelName: "gpt-4o",
-      openAIApiKey: process.env.OPENAI_API_KEY,
-      temperature: 0.2,
-    });
     this.parser = StructuredOutputParser.fromZodSchema(evaluationSchema);
+  }
+
+  private getModel() {
+    if (!this.model) {
+      const apiKey = process.env.OPENAI_API_KEY;
+      if (!apiKey) {
+        throw new Error("Missing OPENAI_API_KEY. Please set it in your environment variables.");
+      }
+      this.model = new ChatOpenAI({
+        modelName: "gpt-4o",
+        openAIApiKey: apiKey,
+        temperature: 0.2,
+      });
+    }
+    return this.model;
   }
 
   async evaluateSubmission(
@@ -58,6 +68,7 @@ export class AIService {
     explanation: string
   ): Promise<EvaluationOutput> {
     const formatInstructions = this.parser.getFormatInstructions();
+    const model = this.getModel();
 
     const prompt = new PromptTemplate({
       template: `
@@ -89,7 +100,7 @@ export class AIService {
       explanation,
     });
 
-    const response = await this.model.invoke(input);
+    const response = await model.invoke(input);
     return await this.parser.parse(response.content as string);
   }
 }

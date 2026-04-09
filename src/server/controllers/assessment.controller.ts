@@ -10,21 +10,25 @@ dotenv.config();
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error("CRITICAL: Missing Supabase configuration. Ensure VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set in environment variables.");
-}
-
-const supabase = createClient(supabaseUrl || "", supabaseServiceKey || "");
+const getSupabase = () => {
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error("Missing Supabase configuration. Ensure VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set.");
+  }
+  return createClient(supabaseUrl, supabaseServiceKey);
+};
 
 // import { problems } from "../config/problems.ts";
 
 export const submitAssessment = async (req: Request, res: Response) => {
   console.log("Received assessment submission:", JSON.stringify(req.body, null, 2));
 
-  if (!supabaseUrl || !supabaseServiceKey) {
+  let supabase;
+  try {
+    supabase = getSupabase();
+  } catch (err: any) {
     return res.status(500).json({ 
       error: "Server configuration error", 
-      details: "Supabase environment variables (VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY) are missing on the server. Please check your Vercel/environment settings." 
+      details: err.message 
     });
   }
 
@@ -165,10 +169,13 @@ export const getNextProblem = async (req: Request, res: Response) => {
   const userId = (req as any).user.uid;
   console.log(`[getNextProblem] Fetching next problem for user: ${userId}`);
 
-  if (!supabaseUrl || !supabaseServiceKey) {
+  let supabase;
+  try {
+    supabase = getSupabase();
+  } catch (err: any) {
     return res.status(500).json({ 
       error: "Server configuration error", 
-      details: "Supabase environment variables (VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY) are missing on the server. Please check your Vercel/environment settings." 
+      details: err.message 
     });
   }
 
@@ -220,7 +227,7 @@ export const getNextProblem = async (req: Request, res: Response) => {
       .eq("difficulty", targetDifficulty);
 
     if (attemptedIds.length > 0) {
-      query = query.not("id", "in", `(${attemptedIds.join(",")})`);
+      query = query.not("id", "in", attemptedIds);
     }
 
     const { data: problemsData, error: problemsError } = await query.limit(10);
@@ -241,7 +248,7 @@ export const getNextProblem = async (req: Request, res: Response) => {
       // Fallback: if no problems left in target difficulty, try any difficulty not attempted
       let fallbackQuery = supabase.from("problems").select("*");
       if (attemptedIds.length > 0) {
-        fallbackQuery = fallbackQuery.not("id", "in", `(${attemptedIds.join(",")})`);
+        fallbackQuery = fallbackQuery.not("id", "in", attemptedIds);
       }
       const { data: fallbackData, error: fallbackError } = await fallbackQuery.limit(1);
       
@@ -274,6 +281,15 @@ export const getNextProblem = async (req: Request, res: Response) => {
 };
 
 export const getProblems = async (req: Request, res: Response) => {
+  let supabase;
+  try {
+    supabase = getSupabase();
+  } catch (err: any) {
+    return res.status(500).json({ 
+      error: "Server configuration error", 
+      details: err.message 
+    });
+  }
   const { data, error } = await supabase.from("problems").select("*");
   if (error) throw error;
   res.json(data);
