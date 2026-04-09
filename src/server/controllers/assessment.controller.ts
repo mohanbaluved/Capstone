@@ -1,11 +1,8 @@
 import { Request, Response } from "express";
-import { aiService } from "../services/ai.service.ts";
-import { scoringService } from "../services/scoring.service.ts";
+import { aiService } from "../services/ai.service";
+import { scoringService } from "../services/scoring.service";
 import { createClient } from "@supabase/supabase-js";
-import { IntegrityData } from "../../types/index.ts";
-import dotenv from "dotenv";
-
-dotenv.config();
+import { IntegrityData } from "../../types/index";
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY;

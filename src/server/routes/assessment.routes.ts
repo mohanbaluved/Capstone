@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { submitAssessment, getProblems, getNextProblem } from "../controllers/assessment.controller.ts";
-import { authMiddleware } from "../middleware/auth.middleware.ts";
-import { asyncHandler } from "../middleware/error.middleware.ts";
+import { submitAssessment, getProblems, getNextProblem } from "../controllers/assessment.controller";
+import { authMiddleware } from "../middleware/auth.middleware";
+import { asyncHandler } from "../middleware/error.middleware";
 
 const router = Router();
 

@@ -2,9 +2,6 @@ import { ChatOpenAI } from "@langchain/openai";
 import { StructuredOutputParser } from "@langchain/core/output_parsers";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { z } from "zod";
-import dotenv from "dotenv";
-
-dotenv.config();
 
 const evaluationSchema = z.object({
   analysis: z.object({

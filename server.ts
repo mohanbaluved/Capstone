@@ -3,8 +3,8 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
-import { errorHandler } from "./src/server/middleware/error.middleware.ts";
-import assessmentRoutes from "./src/server/routes/assessment.routes.ts";
+import { errorHandler } from "./src/server/middleware/error.middleware";
+import assessmentRoutes from "./src/server/routes/assessment.routes";
 
 dotenv.config();
 
@@ -23,12 +23,14 @@ process.on("unhandledRejection", (reason, promise) => {
 });
 
 async function startServer() {
+  console.log("[server] Starting server initialization...");
   const PORT = 3000;
 
   app.use(express.json());
 
   // API Routes
   app.get("/api/health", (req, res) => {
+    console.log("[server] Health check requested");
     res.json({ 
       status: "ok", 
       timestamp: new Date().toISOString(),
@@ -42,12 +44,14 @@ async function startServer() {
     });
   });
 
+  console.log("[server] Registering assessment routes...");
   app.use("/api/assessments", assessmentRoutes);
 
   app.use(errorHandler);
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+    console.log("[server] Initializing Vite middleware...");
     const vite = await createViteServer({
       server: { 
         middlewareMode: true,
@@ -57,6 +61,7 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
+    console.log("[server] Serving static files from dist...");
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     // Only handle SPA routing if not on Vercel (Vercel handles it via routes in vercel.json)
@@ -72,6 +77,8 @@ async function startServer() {
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Server running on http://localhost:${PORT}`);
     });
+  } else {
+    console.log("[server] Running in Vercel environment, skipping listen()");
   }
 }
 
