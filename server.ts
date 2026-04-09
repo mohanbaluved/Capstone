@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { errorHandler } from "./src/server/middleware/error.middleware.ts";
+import assessmentRoutes from "./src/server/routes/assessment.routes.ts";
 
 dotenv.config();
 
@@ -12,6 +13,15 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+// Global error logging for Vercel
+process.on("uncaughtException", (err) => {
+  console.error("UNCAUGHT EXCEPTION:", err);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("UNHANDLED REJECTION at:", promise, "reason:", reason);
+});
+
 async function startServer() {
   const PORT = 3000;
 
@@ -19,10 +29,19 @@ async function startServer() {
 
   // API Routes
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
+    res.json({ 
+      status: "ok", 
+      timestamp: new Date().toISOString(),
+      env: {
+        hasSupabaseUrl: !!(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL),
+        hasSupabaseKey: !!(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY),
+        hasOpenAIKey: !!process.env.OPENAI_API_KEY,
+        nodeEnv: process.env.NODE_ENV,
+        isVercel: !!process.env.VERCEL
+      }
+    });
   });
 
-  const assessmentRoutes = (await import("./src/server/routes/assessment.routes.ts")).default;
   app.use("/api/assessments", assessmentRoutes);
 
   app.use(errorHandler);

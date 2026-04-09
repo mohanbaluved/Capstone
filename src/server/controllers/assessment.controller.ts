@@ -7,12 +7,15 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY;
 
 const getSupabase = () => {
   if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase configuration. Ensure VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set.");
+    const missing = [];
+    if (!supabaseUrl) missing.push("VITE_SUPABASE_URL/SUPABASE_URL");
+    if (!supabaseServiceKey) missing.push("SUPABASE_SERVICE_ROLE_KEY/SERVICE_ROLE_KEY");
+    throw new Error(`Missing Supabase configuration: ${missing.join(", ")}. Please check your environment variables.`);
   }
   return createClient(supabaseUrl, supabaseServiceKey);
 };
@@ -20,12 +23,13 @@ const getSupabase = () => {
 // import { problems } from "../config/problems.ts";
 
 export const submitAssessment = async (req: Request, res: Response) => {
-  console.log("Received assessment submission:", JSON.stringify(req.body, null, 2));
+  console.log("[submitAssessment] Received submission");
 
   let supabase;
   try {
     supabase = getSupabase();
   } catch (err: any) {
+    console.error("[submitAssessment] Config error:", err.message);
     return res.status(500).json({ 
       error: "Server configuration error", 
       details: err.message 

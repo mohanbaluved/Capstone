@@ -4,15 +4,18 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY;
 
 export const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
   if (!supabaseUrl || !supabaseServiceKey) {
     console.error("CRITICAL: Missing Supabase configuration in authMiddleware.");
+    const missing = [];
+    if (!supabaseUrl) missing.push("VITE_SUPABASE_URL/SUPABASE_URL");
+    if (!supabaseServiceKey) missing.push("SUPABASE_SERVICE_ROLE_KEY/SERVICE_ROLE_KEY");
     return res.status(500).json({ 
       error: "Server configuration error", 
-      details: "Supabase environment variables are missing. Please check your Vercel settings." 
+      details: `Missing environment variables: ${missing.join(", ")}` 
     });
   }
 
