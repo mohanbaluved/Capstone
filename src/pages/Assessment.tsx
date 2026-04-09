@@ -58,7 +58,15 @@ const AssessmentPage: React.FC = () => {
         setProblem(res.data);
       } catch (error: any) {
         console.error("Error fetching problem:", error);
-        const message = error.response?.data?.details || error.response?.data?.error || "Failed to load problem. Please try again.";
+        let message = "Failed to load problem. Please try again.";
+        
+        if (error.response?.data) {
+          const data = error.response.data;
+          message = typeof data.details === 'string' ? data.details : 
+                    typeof data.error === 'string' ? data.error : 
+                    JSON.stringify(data.error || data.details || data);
+        }
+        
         toast.error(message);
       } finally {
         setLoading(false);

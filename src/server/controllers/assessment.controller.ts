@@ -20,6 +20,14 @@ const supabase = createClient(supabaseUrl || "", supabaseServiceKey || "");
 
 export const submitAssessment = async (req: Request, res: Response) => {
   console.log("Received assessment submission:", JSON.stringify(req.body, null, 2));
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return res.status(500).json({ 
+      error: "Server configuration error", 
+      details: "Supabase environment variables (VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY) are missing on the server. Please check your Vercel/environment settings." 
+    });
+  }
+
   const { 
     problem, 
     pseudoCode, 
@@ -157,6 +165,13 @@ export const getNextProblem = async (req: Request, res: Response) => {
   const userId = (req as any).user.uid;
   console.log(`[getNextProblem] Fetching next problem for user: ${userId}`);
 
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return res.status(500).json({ 
+      error: "Server configuration error", 
+      details: "Supabase environment variables (VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY) are missing on the server. Please check your Vercel/environment settings." 
+    });
+  }
+
   try {
     // 1. Get user skill score
     const { data: userData, error: userError } = await supabase
@@ -247,9 +262,14 @@ export const getNextProblem = async (req: Request, res: Response) => {
     const randomProblem = problemsData[Math.floor(Math.random() * problemsData.length)];
     console.log(`[getNextProblem] Returning problem: ${randomProblem.title} (${randomProblem.id})`);
     res.json(randomProblem);
-  } catch (error) {
+  } catch (error: any) {
     console.error("[getNextProblem] Unexpected error:", error);
-    res.status(500).json({ error: "Internal server error", details: error instanceof Error ? error.message : String(error) });
+    const errorMessage = error.message || (typeof error === 'string' ? error : JSON.stringify(error));
+    res.status(500).json({ 
+      error: "Internal server error", 
+      details: errorMessage,
+      raw: error 
+    });
   }
 };
 
