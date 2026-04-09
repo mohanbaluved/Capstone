@@ -11,7 +11,7 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-import { problems } from "../config/problems.ts";
+// import { problems } from "../config/problems.ts";
 
 export const submitAssessment = async (req: Request, res: Response) => {
   console.log("Received assessment submission:", JSON.stringify(req.body, null, 2));
@@ -22,7 +22,6 @@ export const submitAssessment = async (req: Request, res: Response) => {
     explanation, 
     integrity, 
     problemId, 
-    problemTitle, 
     language, 
     timeTaken,
     timeLimit,
@@ -31,6 +30,10 @@ export const submitAssessment = async (req: Request, res: Response) => {
   
   const userId = (req as any).user.uid;
   console.log("User ID from token:", userId);
+
+  if (!problemId) {
+    return res.status(400).json({ error: "problemId is required" });
+  }
 
   // 1. AI Evaluation
   console.log("Calling AI service for evaluation...");
@@ -90,6 +93,8 @@ export const submitAssessment = async (req: Request, res: Response) => {
   // 4. Save Assessment
   const assessmentData = {
     user_id: userId,
+    problem_id: problemId,
+    problem_title: problem.title,
     problem: problem.description,
     topic: problem.topic,
     difficulty: problem.difficulty,
@@ -137,6 +142,69 @@ export const submitAssessment = async (req: Request, res: Response) => {
   });
 };
 
+export const getNextProblem = async (req: Request, res: Response) => {
+  const userId = (req as any).user.uid;
+
+  // 1. Get user skill score
+  const { data: userData, error: userError } = await supabase
+    .from("users")
+    .select("skill_score")
+    .eq("uid", userId)
+    .single();
+
+  const skillScore = userData?.skill_score || 0;
+  const difficulty = scoringService.determineSkillLevel(skillScore);
+  
+  // Map skill level to problem difficulty
+  let targetDifficulty = "Easy";
+  if (difficulty === "Intermediate") targetDifficulty = "Medium";
+  if (difficulty === "Advanced" || difficulty === "Expert") targetDifficulty = "Hard";
+
+  // 2. Get attempted problem IDs
+  const { data: attempted, error: attemptedError } = await supabase
+    .from("assessments")
+    .select("problem_id")
+    .eq("user_id", userId);
+
+  const attemptedIds = (attempted || []).map(a => a.problem_id).filter(Boolean);
+
+  // 3. Fetch a problem not attempted and matching difficulty
+  let query = supabase
+    .from("problems")
+    .select("*")
+    .eq("difficulty", targetDifficulty);
+
+  if (attemptedIds.length > 0) {
+    query = query.not("id", "in", `(${attemptedIds.join(",")})`);
+  }
+
+  const { data: problemsData, error: problemsError } = await query.limit(10);
+
+  if (problemsError) throw problemsError;
+
+  if (!problemsData || problemsData.length === 0) {
+    // Fallback: if no problems left in target difficulty, try any difficulty not attempted
+    let fallbackQuery = supabase.from("problems").select("*");
+    if (attemptedIds.length > 0) {
+      fallbackQuery = fallbackQuery.not("id", "in", `(${attemptedIds.join(",")})`);
+    }
+    const { data: fallbackData } = await fallbackQuery.limit(1);
+    
+    if (!fallbackData || fallbackData.length === 0) {
+      // If all problems attempted, return a random one
+      const { data: allProblems } = await supabase.from("problems").select("*").limit(1);
+      return res.json(allProblems?.[0] || null);
+    }
+    return res.json(fallbackData[0]);
+  }
+
+  // Return a random one from the filtered list
+  const randomProblem = problemsData[Math.floor(Math.random() * problemsData.length)];
+  res.json(randomProblem);
+};
+
 export const getProblems = async (req: Request, res: Response) => {
-  res.json(problems);
+  const { data, error } = await supabase.from("problems").select("*");
+  if (error) throw error;
+  res.json(data);
 };

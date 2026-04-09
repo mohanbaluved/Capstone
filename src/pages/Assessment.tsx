@@ -46,12 +46,16 @@ const AssessmentPage: React.FC = () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         const token = session?.access_token;
-        const res = await axios.get("/api/assessments/problems", {
+        const res = await axios.get("/api/assessments/problems/next", {
           headers: { Authorization: `Bearer ${token}` }
         });
-        // Pick a random problem for now
-        const p = res.data[Math.floor(Math.random() * res.data.length)];
-        setProblem(p);
+        
+        if (!res.data) {
+          toast.error("No problems available at the moment.");
+          return;
+        }
+        
+        setProblem(res.data);
       } catch (error) {
         console.error("Error fetching problem:", error);
         toast.error("Failed to load problem. Please try again.");

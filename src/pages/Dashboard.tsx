@@ -38,6 +38,8 @@ const Dashboard: React.FC = () => {
         const mappedData = (data || []).map(item => ({
           id: item.id,
           userId: item.user_id,
+          problemId: item.problem_id,
+          problemTitle: item.problem_title,
           problem: item.problem,
           topic: item.topic,
           difficulty: item.difficulty,
@@ -248,8 +250,8 @@ const Dashboard: React.FC = () => {
                         {a.evaluation.overallGrade || 'B'}
                       </div>
                       <div>
-                        <p className="font-semibold">{a.topic}: {a.difficulty}</p>
-                        <p className="text-xs text-neutral-400">{format(new Date(a.createdAt), 'MMM d, yyyy • h:mm a')}</p>
+                        <p className="font-semibold">{a.problemTitle}</p>
+                        <p className="text-xs text-neutral-400">{a.topic} • {a.difficulty} • {format(new Date(a.createdAt), 'MMM d, yyyy • h:mm a')}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-6">

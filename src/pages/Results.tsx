@@ -38,6 +38,8 @@ const Results: React.FC = () => {
           setAssessment({
             id: data.id,
             userId: data.user_id,
+            problemId: data.problem_id,
+            problemTitle: data.problem_title,
             problem: data.problem,
             topic: data.topic,
             difficulty: data.difficulty,
@@ -107,7 +109,7 @@ const Results: React.FC = () => {
             </Button>
             <div>
               <h1 className="text-3xl font-bold tracking-tight">Assessment Results</h1>
-              <p className="text-neutral-500">{assessment.topic} ({assessment.difficulty}) • {new Date(assessment.createdAt).toLocaleDateString()}</p>
+              <p className="text-neutral-500">{assessment.problemTitle} • {assessment.topic} ({assessment.difficulty}) • {new Date(assessment.createdAt).toLocaleDateString()}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">

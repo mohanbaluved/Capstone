@@ -15,6 +15,8 @@ export interface UserProfile {
 export interface Assessment {
   id?: string;
   userId: string;
+  problemId: string;
+  problemTitle: string;
   problem: string;
   topic: string;
   difficulty: string;
