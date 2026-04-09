@@ -1,16 +1,21 @@
 import { Request, Response } from "express";
 import { aiService } from "../services/ai.service.ts";
 import { scoringService } from "../services/scoring.service.ts";
-import admin from "firebase-admin";
+import { createClient } from "@supabase/supabase-js";
 import { IntegrityData } from "../../types/index.ts";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const db = admin.firestore();
+const supabaseUrl = process.env.VITE_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export const submitAssessment = async (req: Request, res: Response) => {
   const { problem, pseudoCode, code, explanation, integrity, problemId, problemTitle, language, isTimeout } = req.body;
@@ -31,15 +36,18 @@ export const submitAssessment = async (req: Request, res: Response) => {
   const trustWeight = scoringService.computeTrustWeight(integrityScore, confidenceScore);
 
   // 3. Update User Skill
-  const userRef = db.collection("users").doc(userId);
-  const userDoc = await userRef.get();
+  const { data: userData, error: userError } = await supabase
+    .from("users")
+    .select("*")
+    .eq("uid", userId)
+    .single();
+
   let currentSkillScore = 0;
   let topicMastery = {};
 
-  if (userDoc.exists) {
-    const userData = userDoc.data();
-    currentSkillScore = userData?.skillScore || 0;
-    topicMastery = userData?.topicMastery || {};
+  if (userData) {
+    currentSkillScore = userData.skillScore || 0;
+    topicMastery = userData.topicMastery || {};
   }
 
   const newSkillScore = scoringService.updateSkillScore(currentSkillScore, performance, trustWeight);
@@ -51,15 +59,18 @@ export const submitAssessment = async (req: Request, res: Response) => {
   const newTopicScore = scoringService.updateSkillScore(currentTopicScore, performance, trustWeight);
   (topicMastery as any)[topic] = newTopicScore;
 
-  await userRef.set({
-    skillScore: newSkillScore,
-    skillLevel: newSkillLevel,
-    topicMastery,
-    trustWeight,
-    integrityScore,
-    confidenceScore,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  }, { merge: true });
+  await supabase
+    .from("users")
+    .update({
+      skillScore: newSkillScore,
+      skillLevel: newSkillLevel,
+      topicMastery,
+      trustWeight,
+      integrityScore,
+      confidenceScore,
+      updatedAt: new Date().toISOString()
+    })
+    .eq("uid", userId);
 
   // 4. Save Assessment
   const assessmentData = {
@@ -75,13 +86,17 @@ export const submitAssessment = async (req: Request, res: Response) => {
       performance
     },
     integrity,
-    timestamp: admin.firestore.FieldValue.serverTimestamp()
+    timestamp: new Date().toISOString()
   };
 
-  const assessmentRef = await db.collection("assessments").add(assessmentData);
+  const { data: assessmentRef, error: assessmentError } = await supabase
+    .from("assessments")
+    .insert([assessmentData])
+    .select()
+    .single();
 
   res.json({
-    id: assessmentRef.id,
+    id: assessmentRef?.id,
     performance,
     newSkillScore,
     newSkillLevel,

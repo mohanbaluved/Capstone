@@ -1,8 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { auth, signInWithGoogle } from "../lib/firebase.ts";
-import { User, onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db } from "../lib/firebase.ts";
+import { supabase } from "../lib/supabase.ts";
+import { User } from "@supabase/supabase-js";
 import { UserProfile } from "../types/index.ts";
 
 interface AuthContextType {
@@ -10,6 +8,8 @@ interface AuthContextType {
   profile: UserProfile | null;
   loading: boolean;
   login: () => Promise<void>;
+  loginWithEmail: (email: string, pass: string) => Promise<void>;
+  signupWithEmail: (email: string, pass: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -21,18 +21,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const currentUser = session?.user ?? null;
       setUser(currentUser);
       if (currentUser) {
-        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-        if (userDoc.exists()) {
-          setProfile(userDoc.data() as UserProfile);
-        } else {
-          // Initialize profile
+        await fetchProfile(currentUser.id);
+      } else {
+        setProfile(null);
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const fetchProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("uid", userId)
+        .single();
+
+      if (error && error.code === "PGRST116") {
+        // Profile doesn't exist, create it
+        const { data: userData } = await supabase.auth.getUser();
+        const currentUser = userData.user;
+        
+        if (currentUser) {
           const newProfile: UserProfile = {
-            uid: currentUser.uid,
+            uid: currentUser.id,
             email: currentUser.email || "",
-            displayName: currentUser.displayName || "",
+            displayName: currentUser.user_metadata.full_name || currentUser.email?.split('@')[0] || "",
             skillScore: 0,
             skillLevel: "Beginner",
             topicMastery: {},
@@ -42,28 +73,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
-          await setDoc(doc(db, "users", currentUser.uid), newProfile);
-          setProfile(newProfile);
+          
+          const { data: createdProfile, error: createError } = await supabase
+            .from("users")
+            .insert([newProfile])
+            .select()
+            .single();
+            
+          if (!createError) {
+            setProfile(createdProfile as UserProfile);
+          }
         }
-      } else {
-        setProfile(null);
+      } else if (data) {
+        setProfile(data as UserProfile);
       }
+    } catch (err) {
+      console.error("Error fetching profile:", err);
+    } finally {
       setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
+    }
+  };
 
   const login = async () => {
-    await signInWithGoogle();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
+    if (error) throw error;
+  };
+
+  const loginWithEmail = async (email: string, pass: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
+    if (error) throw error;
+  };
+
+  const signupWithEmail = async (email: string, pass: string, name: string) => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password: pass,
+      options: {
+        data: {
+          full_name: name,
+        },
+      },
+    });
+    if (error) throw error;
   };
 
   const logout = async () => {
-    await signOut(auth);
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, profile, loading, login, loginWithEmail, signupWithEmail, logout }}>
       {children}
     </AuthContext.Provider>
   );

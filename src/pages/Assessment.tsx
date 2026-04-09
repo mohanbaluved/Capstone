@@ -10,6 +10,7 @@ import { Progress } from "../components/ui/progress.tsx";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { supabase } from "../lib/supabase.ts";
 import { Problem, IntegrityData } from "../types/index.ts";
 import { Clock, AlertTriangle, Send, Code, FileText, MessageSquare } from "lucide-react";
 
@@ -43,7 +44,8 @@ const AssessmentPage: React.FC = () => {
   useEffect(() => {
     const fetchProblem = async () => {
       try {
-        const token = await user?.getIdToken();
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
         const res = await axios.get("/api/assessments/problems", {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -114,7 +116,8 @@ const AssessmentPage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const token = await user?.getIdToken();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
       const res = await axios.post("/api/assessments/submit", {
         problem,
         problemId: problem?.id,

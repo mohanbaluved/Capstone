@@ -1,10 +1,12 @@
 import { Request, Response, NextFunction } from "express";
-import admin from "firebase-admin";
+import { createClient } from "@supabase/supabase-js";
+import dotenv from "dotenv";
 
-// Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
+dotenv.config();
+
+const supabaseUrl = process.env.VITE_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
@@ -14,8 +16,17 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
 
   const token = authHeader.split(" ")[1];
   try {
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    (req as any).user = decodedToken;
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (error || !user) {
+      throw error || new Error("User not found");
+    }
+
+    (req as any).user = {
+      uid: user.id,
+      email: user.email,
+      ...user.user_metadata
+    };
     next();
   } catch (error) {
     console.error("Error verifying token:", error);

@@ -1,4 +1,4 @@
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { ChatOpenAI } from "@langchain/openai";
 import { StructuredOutputParser } from "@langchain/core/output_parsers";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { z } from "zod";
@@ -38,13 +38,13 @@ const evaluationSchema = z.object({
 export type EvaluationOutput = z.infer<typeof evaluationSchema>;
 
 export class AIService {
-  private model: ChatGoogleGenerativeAI;
+  private model: ChatOpenAI;
   private parser: StructuredOutputParser<typeof evaluationSchema>;
 
   constructor() {
-    this.model = new ChatGoogleGenerativeAI({
-      model: "gemini-3-flash-preview",
-      apiKey: process.env.GEMINI_API_KEY,
+    this.model = new ChatOpenAI({
+      modelName: "gpt-4o",
+      openAIApiKey: process.env.OPENAI_API_KEY,
       temperature: 0.2,
     });
     this.parser = StructuredOutputParser.fromZodSchema(evaluationSchema);

@@ -8,8 +8,7 @@ import { Badge } from "../components/ui/badge.tsx";
 import { Button } from "../components/ui/button.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs.tsx";
 import { ScrollArea } from "../components/ui/scroll-area.tsx";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "../lib/firebase.ts";
+import { supabase } from "../lib/supabase.ts";
 import { Assessment } from "../types/index.ts";
 import { 
   CheckCircle2, AlertCircle, Lightbulb, BarChart3, 
@@ -29,10 +28,14 @@ const Results: React.FC = () => {
     const fetchAssessment = async () => {
       if (!id) return;
       try {
-        const docRef = doc(db, "assessments", id);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setAssessment({ id: docSnap.id, ...docSnap.data() } as Assessment);
+        const { data, error } = await supabase
+          .from("assessments")
+          .select("*")
+          .eq("id", id)
+          .single();
+          
+        if (data) {
+          setAssessment(data as Assessment);
         }
       } catch (error) {
         console.error("Error fetching assessment:", error);

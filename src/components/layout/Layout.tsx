@@ -46,12 +46,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               {user && (
                 <div className="flex items-center gap-3 pr-4 border-r border-neutral-200">
                   <div className="text-right hidden sm:block">
-                    <p className="text-sm font-semibold">{user.displayName}</p>
+                    <p className="text-sm font-semibold">{user.user_metadata.full_name || user.email}</p>
                     <p className="text-xs text-neutral-500">{profile?.skillLevel} • {Math.round(profile?.skillScore || 0)} pts</p>
                   </div>
                   <div className="w-8 h-8 rounded-full bg-neutral-200 overflow-hidden">
-                    {user.photoURL ? (
-                      <img src={user.photoURL} alt="Avatar" referrerPolicy="no-referrer" />
+                    {user.user_metadata.avatar_url ? (
+                      <img src={user.user_metadata.avatar_url} alt="Avatar" referrerPolicy="no-referrer" />
                     ) : (
                       <User className="w-full h-full p-1.5 text-neutral-400" />
                     )}
