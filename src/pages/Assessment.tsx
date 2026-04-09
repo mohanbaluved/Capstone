@@ -115,10 +115,17 @@ const AssessmentPage: React.FC = () => {
     }
 
     setSubmitting(true);
+    console.log("Submitting assessment...");
+    
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
-      const res = await axios.post("/api/assessments/submit", {
+      
+      const timeLimit = 1800;
+      const timeTaken = timeLimit - timeLeft;
+      const timedOut = timeLeft === 0;
+
+      const submissionData = {
         problem,
         problemId: problem?.id,
         problemTitle: problem?.title,
@@ -130,11 +137,18 @@ const AssessmentPage: React.FC = () => {
           ...integrity,
           idleTime: integrity.idleTime + idleRef.current
         },
-        isTimeout: timeLeft === 0
-      }, {
+        timeTaken,
+        timeLimit,
+        timedOut
+      };
+
+      console.log("Submission data:", submissionData);
+
+      const res = await axios.post("/api/assessments/submit", submissionData, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
+      console.log("Submission response:", res.data);
       toast.success("Assessment submitted successfully!");
       navigate(`/results/${res.data.id}`);
     } catch (error) {

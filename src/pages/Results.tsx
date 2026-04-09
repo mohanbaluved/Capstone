@@ -38,15 +38,15 @@ const Results: React.FC = () => {
           setAssessment({
             id: data.id,
             userId: data.user_id,
-            problemId: data.problem_id,
-            problemTitle: data.problem_title,
-            language: data.language,
+            problem: data.problem,
+            topic: data.topic,
+            difficulty: data.difficulty,
             code: data.code,
-            pseudoCode: data.pseudo_code,
             explanation: data.explanation,
             evaluation: data.evaluation,
-            integrity: data.integrity,
-            timestamp: data.timestamp
+            performanceScore: data.performance_score,
+            trustWeight: data.trust_weight,
+            createdAt: data.created_at
           } as Assessment);
         }
       } catch (error) {
@@ -62,7 +62,8 @@ const Results: React.FC = () => {
   if (loading) return <Layout><div className="flex items-center justify-center h-96">Loading results...</div></Layout>;
   if (!assessment) return <Layout><div className="flex items-center justify-center h-96">Assessment not found.</div></Layout>;
 
-  const { evaluation, integrity } = assessment;
+  const { evaluation } = assessment;
+  const integrity = evaluation.integrity;
 
   const exportData = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(assessment, null, 2));
@@ -77,13 +78,13 @@ const Results: React.FC = () => {
   const exportCSV = () => {
     const headers = ["Problem", "Date", "Performance", "Logic", "Code", "Communication", "Trust Weight"];
     const row = [
-      assessment.problemTitle,
-      new Date(assessment.timestamp).toLocaleDateString(),
-      Math.round(evaluation.performance * 10),
+      assessment.topic,
+      new Date(assessment.createdAt).toLocaleDateString(),
+      Math.round(assessment.performanceScore),
       evaluation.logic_score,
       evaluation.code_score,
       evaluation.communication_score,
-      Math.round((assessment.integrity as any).trustWeight * 100 || 100)
+      Math.round(assessment.trustWeight * 100)
     ];
     const csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n" + row.join(",");
     const encodedUri = encodeURI(csvContent);
@@ -106,7 +107,7 @@ const Results: React.FC = () => {
             </Button>
             <div>
               <h1 className="text-3xl font-bold tracking-tight">Assessment Results</h1>
-              <p className="text-neutral-500">{assessment.problemTitle} • {new Date(assessment.timestamp).toLocaleDateString()}</p>
+              <p className="text-neutral-500">{assessment.topic} ({assessment.difficulty}) • {new Date(assessment.createdAt).toLocaleDateString()}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -132,7 +133,7 @@ const Results: React.FC = () => {
                 <div>
                   <p className="text-neutral-400 text-sm font-medium uppercase tracking-wider">Performance Score</p>
                   <div className="flex items-baseline gap-2">
-                    <h2 className="text-6xl font-bold">{Math.round(evaluation.performance * 10)}</h2>
+                    <h2 className="text-6xl font-bold">{Math.round(assessment.performanceScore)}</h2>
                     <span className="text-neutral-500 text-xl">/ 100</span>
                   </div>
                 </div>
@@ -175,7 +176,7 @@ const Results: React.FC = () => {
               <div className="pt-4 border-t border-neutral-100">
                 <div className="flex items-center gap-2 text-xs text-neutral-500">
                   <ShieldAlert className="w-3 h-3" />
-                  <span>Trust weight applied to skill update</span>
+                  <span>Trust weight: {Math.round(assessment.trustWeight * 100)}%</span>
                 </div>
               </div>
             </CardContent>

@@ -15,25 +15,37 @@ export interface UserProfile {
 export interface Assessment {
   id?: string;
   userId: string;
-  problemId: string;
-  problemTitle: string;
-  language: string;
+  problem: string;
+  topic: string;
+  difficulty: string;
   code: string;
-  pseudoCode: string;
   explanation: string;
   evaluation: EvaluationResult;
-  integrity: IntegrityData;
-  timestamp: string;
+  performanceScore: number;
+  trustWeight: number;
+  createdAt: string;
 }
 
 export interface EvaluationResult {
   logic_score: number;
   code_score: number;
   communication_score: number;
-  performance: number;
+  overallGrade: string;
   strengths: string[];
   improvements: string[];
   suggestions: string[];
+  performance: number;
+  integrityScore: number;
+  confidenceScore: number;
+  timeTaken: number;
+  timeLimit: number;
+  timedOut: boolean;
+  pseudoCode: string;
+  language: string;
+  integrity: IntegrityData;
+  previousSkillScore: number;
+  updatedSkillScore: number;
+  updatedSkillLevel: string;
   analysis: {
     correctness: number;
     timeComplexity: string;

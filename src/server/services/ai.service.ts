@@ -29,6 +29,7 @@ const evaluationSchema = z.object({
     logic_score: z.number().min(0).max(10),
     code_score: z.number().min(0).max(10),
     communication_score: z.number().min(0).max(10),
+    overallGrade: z.string().describe("Letter grade from A+ to F"),
     strengths: z.array(z.string()),
     improvements: z.array(z.string()),
     suggestions: z.array(z.string()),

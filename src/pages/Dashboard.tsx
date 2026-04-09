@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Layout from "../components/layout/Layout.tsx";
 import { useAuth } from "../contexts/AuthContext.tsx";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card.tsx";
@@ -9,12 +9,56 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar
 } from "recharts";
-import { Brain, Target, Shield, TrendingUp, ArrowRight, Award } from "lucide-react";
+import { Brain, Target, Shield, TrendingUp, ArrowRight, Award, History, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "../lib/supabase.ts";
+import { Assessment } from "../types/index.ts";
+import { format } from "date-fns";
 
 const Dashboard: React.FC = () => {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const navigate = useNavigate();
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAssessments = async () => {
+      if (!user) return;
+      console.log("Fetching assessments for user:", user.id);
+      try {
+        const { data, error } = await supabase
+          .from("assessments")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+        
+        console.log("Fetched assessments:", data);
+        const mappedData = (data || []).map(item => ({
+          id: item.id,
+          userId: item.user_id,
+          problem: item.problem,
+          topic: item.topic,
+          difficulty: item.difficulty,
+          code: item.code,
+          explanation: item.explanation,
+          evaluation: item.evaluation,
+          performanceScore: item.performance_score,
+          trustWeight: item.trust_weight,
+          createdAt: item.created_at
+        } as Assessment));
+        
+        setAssessments(mappedData);
+      } catch (err) {
+        console.error("Error fetching assessments:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAssessments();
+  }, [user]);
 
   const masteryData = profile?.topicMastery ? Object.entries(profile.topicMastery).map(([topic, score]) => ({
     subject: topic,
@@ -28,12 +72,15 @@ const Dashboard: React.FC = () => {
     { subject: 'Best Practices', A: 0, fullMark: 100 },
   ];
 
-  const trendData = [
-    { name: 'Week 1', score: 20 },
-    { name: 'Week 2', score: 35 },
-    { name: 'Week 3', score: 45 },
-    { name: 'Week 4', score: profile?.skillScore || 50 },
-  ];
+  const trendData = assessments.length > 0 
+    ? assessments.slice().reverse().map((a, i) => ({
+        name: `A${i+1}`,
+        score: a.performanceScore
+      }))
+    : [
+        { name: 'Start', score: 0 },
+        { name: 'Current', score: profile?.skillScore || 0 },
+      ];
 
   return (
     <Layout>
@@ -92,14 +139,14 @@ const Dashboard: React.FC = () => {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-neutral-500">Integrity</p>
-                  <h3 className="text-2xl font-bold">{profile?.integrityScore || 0}</h3>
+                  <p className="text-sm font-medium text-neutral-500">Total Assessments</p>
+                  <h3 className="text-2xl font-bold">{assessments.length}</h3>
                 </div>
                 <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center">
-                  <Target className="text-purple-600 w-5 h-5" />
+                  <History className="text-purple-600 w-5 h-5" />
                 </div>
               </div>
-              <p className="mt-4 text-xs text-neutral-500">Assessment behavior score</p>
+              <p className="mt-4 text-xs text-neutral-500">Assessments completed</p>
             </CardContent>
           </Card>
 
@@ -147,7 +194,7 @@ const Dashboard: React.FC = () => {
           <Card className="col-span-1">
             <CardHeader>
               <CardTitle>Skill Progression</CardTitle>
-              <CardDescription>Your growth over time</CardDescription>
+              <CardDescription>Performance across assessments</CardDescription>
             </CardHeader>
             <CardContent className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
@@ -172,65 +219,61 @@ const Dashboard: React.FC = () => {
           </Card>
         </div>
 
-        {/* Recent Activity & Recommendations */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle>Recommended Modules</CardTitle>
-              <CardDescription>Based on your current skill gaps</CardDescription>
-            </CardHeader>
-            <CardContent>
+        {/* Recent Assessments Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Assessments</CardTitle>
+            <CardDescription>Your latest technical evaluations</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="text-center py-8 text-neutral-500">Loading assessments...</div>
+            ) : assessments.length === 0 ? (
+              <div className="text-center py-12 border-2 border-dashed border-neutral-100 rounded-2xl">
+                <FileText className="w-12 h-12 text-neutral-200 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold">No assessments yet</h3>
+                <p className="text-neutral-500 mb-6">Complete your first assessment to see results here.</p>
+                <Button onClick={() => navigate("/assessment")}>Start Now</Button>
+              </div>
+            ) : (
               <div className="space-y-4">
-                {[
-                  { title: 'Advanced Array Manipulation', topic: 'Arrays', difficulty: 'Medium', time: '45m' },
-                  { title: 'Dynamic Programming Patterns', topic: 'Logic', difficulty: 'Hard', time: '1h 20m' },
-                  { title: 'Clean Code: Naming Conventions', topic: 'Best Practices', difficulty: 'Easy', time: '20m' },
-                ].map((module, i) => (
-                  <div key={i} className="flex items-center justify-between p-4 rounded-xl border border-neutral-100 hover:border-neutral-200 transition-colors group">
+                {assessments.slice(0, 5).map((a) => (
+                  <div 
+                    key={a.id} 
+                    onClick={() => navigate(`/results/${a.id}`)}
+                    className="flex items-center justify-between p-4 rounded-xl border border-neutral-100 hover:border-neutral-200 hover:bg-neutral-50/50 transition-all cursor-pointer group"
+                  >
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-lg bg-neutral-50 flex items-center justify-center group-hover:bg-black group-hover:text-white transition-colors">
-                        <Award className="w-5 h-5" />
+                      <div className="w-10 h-10 rounded-lg bg-neutral-100 flex items-center justify-center font-bold text-lg group-hover:bg-black group-hover:text-white transition-colors">
+                        {a.evaluation.overallGrade || 'B'}
                       </div>
                       <div>
-                        <p className="font-semibold">{module.title}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="secondary" className="text-[10px] uppercase tracking-wider">{module.topic}</Badge>
-                          <span className="text-xs text-neutral-400">{module.difficulty} • {module.time}</span>
-                        </div>
+                        <p className="font-semibold">{a.topic}: {a.difficulty}</p>
+                        <p className="text-xs text-neutral-400">{format(new Date(a.createdAt), 'MMM d, yyyy • h:mm a')}</p>
                       </div>
                     </div>
-                    <Button variant="ghost" size="sm">Start</Button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <CardTitle>Weak Areas</CardTitle>
-              <CardDescription>Topics to focus on</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {[
-                  { topic: 'Recursion', score: 24 },
-                  { topic: 'Graph Theory', score: 15 },
-                  { topic: 'Bit Manipulation', score: 32 },
-                ].map((area, i) => (
-                  <div key={i} className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="font-medium">{area.topic}</span>
-                      <span className="text-neutral-500">{area.score}%</span>
+                    <div className="flex items-center gap-6">
+                      <div className="text-right hidden sm:block">
+                        <p className="text-sm font-bold">{Math.round(a.performanceScore)}/100</p>
+                        <p className="text-[10px] text-neutral-400 uppercase tracking-wider">Score</p>
+                      </div>
+                      <div className="text-right hidden sm:block">
+                        <p className="text-sm font-bold">{Math.round(a.trustWeight * 100)}%</p>
+                        <p className="text-[10px] text-neutral-400 uppercase tracking-wider">Trust</p>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-neutral-300 group-hover:text-black transition-colors" />
                     </div>
-                    <Progress value={area.score} className="h-1 bg-neutral-100" />
                   </div>
                 ))}
+                {assessments.length > 5 && (
+                  <Button variant="ghost" className="w-full mt-2" onClick={() => navigate("/history")}>
+                    View All Assessments
+                  </Button>
+                )}
               </div>
-              <Button variant="outline" className="w-full mt-8">View All Topics</Button>
-            </CardContent>
-          </Card>
-        </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </Layout>
   );

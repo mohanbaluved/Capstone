@@ -3,37 +3,52 @@ import { aiService } from "../services/ai.service.ts";
 import { scoringService } from "../services/scoring.service.ts";
 import { createClient } from "@supabase/supabase-js";
 import { IntegrityData } from "../../types/index.ts";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 
 dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+import { problems } from "../config/problems.ts";
+
 export const submitAssessment = async (req: Request, res: Response) => {
-  const { problem, pseudoCode, code, explanation, integrity, problemId, problemTitle, language, isTimeout } = req.body;
+  console.log("Received assessment submission:", JSON.stringify(req.body, null, 2));
+  const { 
+    problem, 
+    pseudoCode, 
+    code, 
+    explanation, 
+    integrity, 
+    problemId, 
+    problemTitle, 
+    language, 
+    timeTaken,
+    timeLimit,
+    timedOut 
+  } = req.body;
+  
   const userId = (req as any).user.uid;
+  console.log("User ID from token:", userId);
 
   // 1. AI Evaluation
+  console.log("Calling AI service for evaluation...");
   const evaluation = await aiService.evaluateSubmission(
     JSON.stringify(problem),
     pseudoCode,
     code,
     explanation
   );
+  console.log("AI Evaluation result:", JSON.stringify(evaluation, null, 2));
 
   // 2. Scoring
   const performance = scoringService.computePerformanceScore(evaluation);
   const integrityScore = scoringService.computeIntegrityScore(integrity as IntegrityData);
-  const confidenceScore = scoringService.computeConfidenceScore(code.length, explanation.length, isTimeout);
+  const confidenceScore = scoringService.computeConfidenceScore(code.length, explanation.length, timedOut);
   const trustWeight = scoringService.computeTrustWeight(integrityScore, confidenceScore);
+  
+  console.log("Calculated scores:", { performance, integrityScore, confidenceScore, trustWeight });
 
   // 3. Update User Skill
   const { data: userData, error: userError } = await supabase
@@ -53,12 +68,12 @@ export const submitAssessment = async (req: Request, res: Response) => {
   const newSkillScore = scoringService.updateSkillScore(currentSkillScore, performance, trustWeight);
   const newSkillLevel = scoringService.determineSkillLevel(newSkillScore);
 
-  // Update topic mastery (simplified)
   const topic = problem.topic || "General";
   const currentTopicScore = (topicMastery as any)[topic] || 0;
   const newTopicScore = scoringService.updateSkillScore(currentTopicScore, performance, trustWeight);
   (topicMastery as any)[topic] = newTopicScore;
 
+  console.log("Updating user profile:", { newSkillScore, newSkillLevel });
   await supabase
     .from("users")
     .update({
@@ -75,26 +90,44 @@ export const submitAssessment = async (req: Request, res: Response) => {
   // 4. Save Assessment
   const assessmentData = {
     user_id: userId,
-    problem_id: problemId,
-    problem_title: problemTitle,
-    language,
+    problem: problem.description,
+    topic: problem.topic,
+    difficulty: problem.difficulty,
     code,
-    pseudo_code: pseudoCode,
     explanation,
+    performance_score: performance * 10, // Scale to 0-100
+    trust_weight: trustWeight,
     evaluation: {
       ...evaluation,
-      performance
+      performance,
+      integrityScore,
+      confidenceScore,
+      timeTaken,
+      timeLimit,
+      timedOut,
+      pseudoCode,
+      language,
+      integrity,
+      previousSkillScore: currentSkillScore,
+      updatedSkillScore: newSkillScore,
+      updatedSkillLevel: newSkillLevel
     },
-    integrity,
-    timestamp: new Date().toISOString()
+    created_at: new Date().toISOString()
   };
 
+  console.log("Inserting assessment into database...");
   const { data: assessmentRef, error: assessmentError } = await supabase
     .from("assessments")
     .insert([assessmentData])
     .select()
     .single();
 
+  if (assessmentError) {
+    console.error("Error inserting assessment:", assessmentError);
+    throw assessmentError;
+  }
+
+  console.log("Assessment saved successfully:", assessmentRef.id);
   res.json({
     id: assessmentRef?.id,
     performance,
@@ -105,19 +138,5 @@ export const submitAssessment = async (req: Request, res: Response) => {
 };
 
 export const getProblems = async (req: Request, res: Response) => {
-  try {
-    const problemsPath = path.join(process.cwd(), "src/server/config/problems.json");
-    if (!fs.existsSync(problemsPath)) {
-      // Fallback for different build environments
-      const altPath = path.join(__dirname, "../config/problems.json");
-      const problemsData = fs.readFileSync(altPath, "utf-8");
-      return res.json(JSON.parse(problemsData));
-    }
-    const problemsData = fs.readFileSync(problemsPath, "utf-8");
-    const problems = JSON.parse(problemsData);
-    res.json(problems);
-  } catch (error) {
-    console.error("Error reading problems:", error);
-    res.status(500).json({ error: "Failed to load problems" });
-  }
+  res.json(problems);
 };
