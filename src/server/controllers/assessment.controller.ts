@@ -7,9 +7,14 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error("CRITICAL: Missing Supabase configuration. Ensure VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set in environment variables.");
+}
+
+const supabase = createClient(supabaseUrl || "", supabaseServiceKey || "");
 
 // import { problems } from "../config/problems.ts";
 
@@ -129,6 +134,12 @@ export const submitAssessment = async (req: Request, res: Response) => {
 
   if (assessmentError) {
     console.error("Error inserting assessment:", assessmentError);
+    if (assessmentError.message.includes('column "problem_id" does not exist')) {
+      return res.status(500).json({ 
+        error: "Database schema mismatch", 
+        details: "The 'problem_id' column is missing from the 'assessments' table. Please run the provided SQL script in Supabase." 
+      });
+    }
     throw assessmentError;
   }
 
@@ -144,63 +155,102 @@ export const submitAssessment = async (req: Request, res: Response) => {
 
 export const getNextProblem = async (req: Request, res: Response) => {
   const userId = (req as any).user.uid;
+  console.log(`[getNextProblem] Fetching next problem for user: ${userId}`);
 
-  // 1. Get user skill score
-  const { data: userData, error: userError } = await supabase
-    .from("users")
-    .select("skill_score")
-    .eq("uid", userId)
-    .single();
+  try {
+    // 1. Get user skill score
+    const { data: userData, error: userError } = await supabase
+      .from("users")
+      .select("skill_score")
+      .eq("uid", userId)
+      .single();
 
-  const skillScore = userData?.skill_score || 0;
-  const difficulty = scoringService.determineSkillLevel(skillScore);
-  
-  // Map skill level to problem difficulty
-  let targetDifficulty = "Easy";
-  if (difficulty === "Intermediate") targetDifficulty = "Medium";
-  if (difficulty === "Advanced" || difficulty === "Expert") targetDifficulty = "Hard";
-
-  // 2. Get attempted problem IDs
-  const { data: attempted, error: attemptedError } = await supabase
-    .from("assessments")
-    .select("problem_id")
-    .eq("user_id", userId);
-
-  const attemptedIds = (attempted || []).map(a => a.problem_id).filter(Boolean);
-
-  // 3. Fetch a problem not attempted and matching difficulty
-  let query = supabase
-    .from("problems")
-    .select("*")
-    .eq("difficulty", targetDifficulty);
-
-  if (attemptedIds.length > 0) {
-    query = query.not("id", "in", `(${attemptedIds.join(",")})`);
-  }
-
-  const { data: problemsData, error: problemsError } = await query.limit(10);
-
-  if (problemsError) throw problemsError;
-
-  if (!problemsData || problemsData.length === 0) {
-    // Fallback: if no problems left in target difficulty, try any difficulty not attempted
-    let fallbackQuery = supabase.from("problems").select("*");
-    if (attemptedIds.length > 0) {
-      fallbackQuery = fallbackQuery.not("id", "in", `(${attemptedIds.join(",")})`);
+    if (userError && userError.code !== 'PGRST116') {
+      console.error("[getNextProblem] Error fetching user data:", userError);
     }
-    const { data: fallbackData } = await fallbackQuery.limit(1);
+
+    const skillScore = userData?.skill_score || 0;
+    const difficulty = scoringService.determineSkillLevel(skillScore);
+    console.log(`[getNextProblem] User skill score: ${skillScore}, Level: ${difficulty}`);
     
-    if (!fallbackData || fallbackData.length === 0) {
-      // If all problems attempted, return a random one
-      const { data: allProblems } = await supabase.from("problems").select("*").limit(1);
-      return res.json(allProblems?.[0] || null);
-    }
-    return res.json(fallbackData[0]);
-  }
+    // Map skill level to problem difficulty
+    let targetDifficulty = "Easy";
+    if (difficulty === "Intermediate") targetDifficulty = "Medium";
+    if (difficulty === "Advanced" || difficulty === "Expert") targetDifficulty = "Hard";
 
-  // Return a random one from the filtered list
-  const randomProblem = problemsData[Math.floor(Math.random() * problemsData.length)];
-  res.json(randomProblem);
+    // 2. Get attempted problem IDs
+    const { data: attempted, error: attemptedError } = await supabase
+      .from("assessments")
+      .select("problem_id")
+      .eq("user_id", userId);
+
+    if (attemptedError) {
+      console.error("[getNextProblem] Error fetching attempted problems:", attemptedError);
+      // If this fails, it might be because problem_id column is missing
+      if (attemptedError.message.includes('column "problem_id" does not exist')) {
+        return res.status(500).json({ 
+          error: "Database schema mismatch", 
+          details: "The 'problem_id' column is missing from the 'assessments' table. Please run the provided SQL script in Supabase." 
+        });
+      }
+    }
+
+    const attemptedIds = (attempted || []).map(a => a.problem_id).filter(Boolean);
+    console.log(`[getNextProblem] Attempted problem IDs: ${attemptedIds.length}`);
+
+    // 3. Fetch a problem not attempted and matching difficulty
+    let query = supabase
+      .from("problems")
+      .select("*")
+      .eq("difficulty", targetDifficulty);
+
+    if (attemptedIds.length > 0) {
+      query = query.not("id", "in", `(${attemptedIds.join(",")})`);
+    }
+
+    const { data: problemsData, error: problemsError } = await query.limit(10);
+
+    if (problemsError) {
+      console.error("[getNextProblem] Error fetching problems:", problemsError);
+      if (problemsError.message.includes('relation "problems" does not exist')) {
+        return res.status(500).json({ 
+          error: "Database table missing", 
+          details: "The 'problems' table does not exist. Please run the provided SQL script in Supabase." 
+        });
+      }
+      throw problemsError;
+    }
+
+    if (!problemsData || problemsData.length === 0) {
+      console.log("[getNextProblem] No problems found for target difficulty, trying fallback...");
+      // Fallback: if no problems left in target difficulty, try any difficulty not attempted
+      let fallbackQuery = supabase.from("problems").select("*");
+      if (attemptedIds.length > 0) {
+        fallbackQuery = fallbackQuery.not("id", "in", `(${attemptedIds.join(",")})`);
+      }
+      const { data: fallbackData, error: fallbackError } = await fallbackQuery.limit(1);
+      
+      if (fallbackError) {
+        console.error("[getNextProblem] Fallback error:", fallbackError);
+      }
+
+      if (!fallbackData || fallbackData.length === 0) {
+        console.log("[getNextProblem] All problems attempted or none exist. Returning a random one.");
+        // If all problems attempted, return a random one
+        const { data: allProblems } = await supabase.from("problems").select("*").limit(1);
+        return res.json(allProblems?.[0] || null);
+      }
+      return res.json(fallbackData[0]);
+    }
+
+    // Return a random one from the filtered list
+    const randomProblem = problemsData[Math.floor(Math.random() * problemsData.length)];
+    console.log(`[getNextProblem] Returning problem: ${randomProblem.title} (${randomProblem.id})`);
+    res.json(randomProblem);
+  } catch (error) {
+    console.error("[getNextProblem] Unexpected error:", error);
+    res.status(500).json({ error: "Internal server error", details: error instanceof Error ? error.message : String(error) });
+  }
 };
 
 export const getProblems = async (req: Request, res: Response) => {
